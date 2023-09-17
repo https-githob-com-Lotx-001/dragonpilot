@@ -1,40 +1,27 @@
 import crcmod
-from openpilot.selfdrive.car.hyundai.values import CAR, CHECKSUM, CAMERA_SCC_CAR, HyundaiFlags, LEGACY_SAFETY_MODE_CAR_ALT
+from selfdrive.car.hyundai.values import CAR, CHECKSUM, CAMERA_SCC_CAR
 
 hyundai_checksum = crcmod.mkCrcFun(0x11D, initCrc=0xFD, rev=False, xorOut=0xdf)
 
 def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req,
                   torque_fault, lkas11, sys_warning, sys_state, enabled,
                   left_lane, right_lane,
-                  left_lane_depart, right_lane_depart, bus, ldws, CP):
-  values = {s: lkas11[s] for s in [
-    "CF_Lkas_LdwsActivemode",
-    "CF_Lkas_LdwsSysState",
-    "CF_Lkas_SysWarning",
-    "CF_Lkas_LdwsLHWarning",
-    "CF_Lkas_LdwsRHWarning",
-    "CF_Lkas_HbaLamp",
-    "CF_Lkas_FcwBasReq",
-    "CF_Lkas_HbaSysState",
-    "CF_Lkas_FcwOpt",
-    "CF_Lkas_HbaOpt",
-    "CF_Lkas_FcwSysState",
-    "CF_Lkas_FcwCollisionWarning",
-    "CF_Lkas_FusionState",
-    "CF_Lkas_FcwOpt_USM",
-    "CF_Lkas_LdwsOpt_USM",
-  ]}
+                  left_lane_depart, right_lane_depart):
+  values = lkas11
   values["CF_Lkas_LdwsSysState"] = sys_state
-  values["CF_Lkas_SysWarning"] = 3 if sys_warning else 0 # if (sys_warning and car_fingerprint not in LEGACY_SAFETY_MODE_CAR_ALT) else 0
+  values["CF_Lkas_SysWarning"] = 3 if sys_warning else 0
   values["CF_Lkas_LdwsLHWarning"] = left_lane_depart
   values["CF_Lkas_LdwsRHWarning"] = right_lane_depart
   values["CR_Lkas_StrToqReq"] = apply_steer
-  values["CF_Lkas_ActToi"] = steer_req # and not (torque_fault and (1 if car_fingerprint in LEGACY_SAFETY_MODE_CAR_ALT else 0))
+  values["CF_Lkas_ActToi"] = steer_req
   values["CF_Lkas_ToiFlt"] = torque_fault  # seems to allow actuation on CR_Lkas_StrToqReq
   values["CF_Lkas_MsgCount"] = frame % 0x10
-  values["CF_Lkas_Chksum"] = 0
 
-  if CP.flags & HyundaiFlags.SEND_LFA.value:
+  if car_fingerprint in (CAR.SONATA, CAR.PALISADE, CAR.KIA_NIRO_EV, CAR.KIA_NIRO_HEV_2021, CAR.SANTA_FE,
+                         CAR.IONIQ_EV_2020, CAR.IONIQ_PHEV, CAR.KIA_SELTOS, CAR.ELANTRA_2021, CAR.GENESIS_G70_2020,
+                         CAR.ELANTRA_HEV_2021, CAR.SONATA_HYBRID, CAR.KONA_EV, CAR.KONA_HEV, CAR.KONA_EV_2022,
+                         CAR.SANTA_FE_2022, CAR.KIA_K5_2021, CAR.IONIQ_HEV_2022, CAR.SANTA_FE_HEV_2022,
+                         CAR.SANTA_FE_PHEV_2022, CAR.KIA_STINGER_2022, CAR.KIA_K5_HEV_2020, CAR.KIA_CEED):
     values["CF_Lkas_LdwsActivemode"] = int(left_lane) + (int(right_lane) << 1)
     values["CF_Lkas_LdwsOpt_USM"] = 2
 
@@ -68,13 +55,10 @@ def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req,
     values["CF_Lkas_LdwsActivemode"] = 0
     values["CF_Lkas_FcwOpt_USM"] = 0
 
-  elif car_fingerprint in (CAR.HYUNDAI_GENESIS, CAR.GENESIS_DH):
+  elif car_fingerprint == CAR.HYUNDAI_GENESIS:
     # This field is actually LdwsActivemode
     # Genesis and Optima fault when forwarding while engaged
     values["CF_Lkas_LdwsActivemode"] = 2
-
-  if ldws:
-  	values["CF_Lkas_LdwsOpt_USM"] = 3
 
   dat = packer.make_can_msg("LKAS11", 0, values)[2]
 
@@ -91,30 +75,15 @@ def create_lkas11(packer, frame, car_fingerprint, apply_steer, steer_req,
 
   values["CF_Lkas_Chksum"] = checksum
 
-  return packer.make_can_msg("LKAS11", bus, values)
+  return packer.make_can_msg("LKAS11", 0, values)
 
 
-def create_clu11(packer, frame, clu11, button, speed = None, bus = 0):
-  values = {s: clu11[s] for s in [
-    "CF_Clu_CruiseSwState",
-    "CF_Clu_CruiseSwMain",
-    "CF_Clu_SldMainSW",
-    "CF_Clu_ParityBit1",
-    "CF_Clu_VanzDecimal",
-    "CF_Clu_Vanz",
-    "CF_Clu_SPEED_UNIT",
-    "CF_Clu_DetentOut",
-    "CF_Clu_RheostatLevel",
-    "CF_Clu_CluInfo",
-    "CF_Clu_AmpInfo",
-    "CF_Clu_AliveCnt1",
-  ]}
-  if speed != None:
-    values["CF_Clu_Vanz"] = speed
+def create_clu11(packer, frame, clu11, button, car_fingerprint):
+  values = clu11
   values["CF_Clu_CruiseSwState"] = button
   values["CF_Clu_AliveCnt1"] = frame % 0x10
   # send buttons to camera on camera-scc based cars
-  #bus = 2 if car_fingerprint in CAMERA_SCC_CAR else 0
+  bus = 2 if car_fingerprint in CAMERA_SCC_CAR else 0
   return packer.make_can_msg("CLU11", bus, values)
 
 
@@ -127,7 +96,7 @@ def create_lfahda_mfc(packer, enabled, hda_set_speed=0):
   }
   return packer.make_can_msg("LFAHDA_MFC", 0, values)
 
-def create_acc_commands(packer, enabled, accel, upper_jerk, idx, lead_visible, set_speed, stopping, long_override, use_fca):
+def create_acc_commands(packer, enabled, accel, upper_jerk, idx, lead_visible, set_speed, stopping, long_override):
   commands = []
 
   scc11_values = {
@@ -140,7 +109,6 @@ def create_acc_commands(packer, enabled, accel, upper_jerk, idx, lead_visible, s
     "ACC_ObjLatPos": 0,
     "ACC_ObjRelSpd": 0,
     "ACC_ObjDist": 1, # close lead makes controls tighter
-    "SCCInfoDisplay": 4 if stopping else 0,
     }
   commands.append(packer.make_can_msg("SCC11", 0, scc11_values))
 
@@ -151,13 +119,6 @@ def create_acc_commands(packer, enabled, accel, upper_jerk, idx, lead_visible, s
     "aReqValue": accel,  # stock ramps up and down respecting jerk limit until it reaches aReqRaw
     "CR_VSM_Alive": idx % 0xF,
   }
-
-  # show AEB disabled indicator on dash with SCC12 if not sending FCA messages.
-  # these signals also prevent a TCS fault on non-FCA cars with alpha longitudinal
-  if not use_fca:
-    scc12_values["CF_VSM_ConfMode"] = 1
-    scc12_values["AEB_Status"] = 1  # AEB disabled
-
   scc12_dat = packer.make_can_msg("SCC12", 0, scc12_values)[2]
   scc12_values["CR_VSM_ChkSum"] = 0x10 - sum(sum(divmod(i, 16)) for i in scc12_dat) % 0x10
 
@@ -173,19 +134,17 @@ def create_acc_commands(packer, enabled, accel, upper_jerk, idx, lead_visible, s
   }
   commands.append(packer.make_can_msg("SCC14", 0, scc14_values))
 
-  # Only send FCA11 on cars where it exists on the bus
-  if use_fca:
-    # note that some vehicles most likely have an alternate checksum/counter definition
-    # https://github.com/commaai/opendbc/commit/9ddcdb22c4929baf310295e832668e6e7fcfa602
-    fca11_values = {
-      "CR_FCA_Alive": idx % 0xF,
-      "PAINT1_Status": 1,
-      "FCA_DrvSetStatus": 1,
-      "FCA_Status": 1,  # AEB disabled
-    }
-    fca11_dat = packer.make_can_msg("FCA11", 0, fca11_values)[2]
-    fca11_values["CR_FCA_ChkSum"] = hyundai_checksum(fca11_dat[:7])
-    commands.append(packer.make_can_msg("FCA11", 0, fca11_values))
+  # note that some vehicles most likely have an alternate checksum/counter definition
+  # https://github.com/commaai/opendbc/commit/9ddcdb22c4929baf310295e832668e6e7fcfa602
+  fca11_values = {
+    "CR_FCA_Alive": idx % 0xF,
+    "PAINT1_Status": 1,
+    "FCA_DrvSetStatus": 1,
+    "FCA_Status": 1, # AEB disabled
+  }
+  fca11_dat = packer.make_can_msg("FCA11", 0, fca11_values)[2]
+  fca11_values["CR_FCA_ChkSum"] = hyundai_checksum(fca11_dat[:7])
+  commands.append(packer.make_can_msg("FCA11", 0, fca11_values))
 
   return commands
 
@@ -199,7 +158,6 @@ def create_acc_opt(packer):
   }
   commands.append(packer.make_can_msg("SCC13", 0, scc13_values))
 
-  # TODO: this needs to be detected and conditionally sent on unsupported long cars
   fca12_values = {
     "FCA_DrvSetState": 2,
     "FCA_USM": 1, # AEB disabled
@@ -213,143 +171,3 @@ def create_frt_radar_opt(packer):
     "CF_FCA_Equip_Front_Radar": 1,
   }
   return packer.make_can_msg("FRT_RADAR11", 0, frt_radar11_values)
-
-def create_mdps12(packer, frame, mdps12):
-  values = mdps12
-  values["CF_Mdps_ToiActive"] = 0
-  values["CF_Mdps_ToiUnavail"] = 1
-  values["CF_Mdps_MsgCount2"] = frame % 0x100
-  values["CF_Mdps_Chksum2"] = 0
-
-  dat = packer.make_can_msg("MDPS12", 2, values)[2]
-  checksum = sum(dat) % 256
-  values["CF_Mdps_Chksum2"] = checksum
-  
-  return packer.make_can_msg("MDPS12", 2, values)
-  
-def create_scc11(packer, frame, set_speed, lead_visible, scc_live, lead_dist, lead_vrel, lead_yrel, car_fingerprint, speed, standstill, gap_setting, stopping, radar_recognition, scc11):
-  values = scc11
-  values["AliveCounterACC"] = frame // 2 % 0x10
-  if not radar_recognition:
-    if stopping:
-      values["SCCInfoDisplay"] = 4
-    else:
-      values["SCCInfoDisplay"] = 0
-  if not scc_live:
-    if standstill:
-      values["SCCInfoDisplay"] = 4
-    else:
-      values["SCCInfoDisplay"] = 0
-    values["DriverAlertDisplay"] = 0
-    values["MainMode_ACC"] = 1
-    values["VSetDis"] = set_speed
-    values["TauGapSet"] = gap_setting
-    values["ObjValid"] = lead_visible
-    values["ACC_ObjStatus"] = lead_visible
-    values["ACC_ObjRelSpd"] = clip(lead_vrel if lead_visible else 0, -20., 20.)
-    values["ACC_ObjDist"] = clip(lead_dist if lead_visible else 204.6, 0., 204.6)
-    values["ACC_ObjLatPos"] = clip(-lead_yrel if lead_visible else 0, -170., 170.)
-
-  return packer.make_can_msg("SCC11", 0, values)
-
-def create_scc12(packer, apply_accel, enabled, scc_live, gaspressed, brakepressed, aebcmdact, car_fingerprint, speed, stopping, standstill, radar_recognition, cnt, scc12):
-  values = scc12
-  if not aebcmdact:
-    if enabled and car_fingerprint == CAR.KIA_NIRO_EV:
-      values["ACCMode"] = 2 if gaspressed and (apply_accel > -0.2) else 1
-      values["aReqRaw"] = apply_accel
-      values["aReqValue"] = apply_accel
-      if not radar_recognition and standstill and stopping:
-        if stopping:
-          values["StopReq"] = 1
-        else:
-          values["StopReq"] = 0
-    elif enabled and not brakepressed:
-      values["ACCMode"] = 2 if gaspressed and (apply_accel > -0.2) else 1
-      values["aReqRaw"] = apply_accel
-      values["aReqValue"] = apply_accel
-      if not radar_recognition and standstill and stopping:
-        values["aReqRaw"] = 0
-        values["aReqValue"] = 0
-        if stopping:
-          values["StopReq"] = 1
-        else:
-          values["StopReq"] = 0
-    else:
-      values["ACCMode"] = 0
-      values["aReqRaw"] = 0
-      values["aReqValue"] = 0
-  if not scc_live:
-    if apply_accel < 0.0 and standstill:
-      values["StopReq"] = 1
-    else:
-      values["StopReq"] = 0
-    values["ACCMode"] = 1 if enabled else 0 # 2 if gas padel pressed
-  values["CR_VSM_Alive"] = cnt
-  values["CR_VSM_ChkSum"] = 0
-  dat = packer.make_can_msg("SCC12", 0, values)[2]
-  values["CR_VSM_ChkSum"] = 16 - sum([sum(divmod(i, 16)) for i in dat]) % 16
-
-  return packer.make_can_msg("SCC12", 0, values)
-
-def create_scc13(packer, scc13):
-  values = scc13
-  return packer.make_can_msg("SCC13", 0, values)
-
-def create_scc14(packer, enabled, scc14, aebcmdact, lead_visible, lead_dist, v_ego, standstill, car_fingerprint):
-  values = scc14
-  if enabled and not aebcmdact and car_fingerprint == CAR.NIRO_EV_DE:
-    if standstill:
-      values["JerkUpperLimit"] = 0.5
-      values["JerkLowerLimit"] = 10.
-      values["ComfortBandUpper"] = 0.
-      values["ComfortBandLower"] = 0.
-      if v_ego > 0.27:
-        values["ComfortBandUpper"] = 2.
-        values["ComfortBandLower"] = 0.
-    else:
-      values["JerkUpperLimit"] = 50.
-      values["JerkLowerLimit"] = 50.
-      values["ComfortBandUpper"] = 50.
-      values["ComfortBandLower"] = 50.
-  elif enabled and not aebcmdact:
-    values["JerkUpperLimit"] = 12.7
-    values["JerkLowerLimit"] = 12.7
-    values["ComfortBandUpper"] = 0
-    values["ComfortBandLower"] = 0
-    values["ACCMode"] = 1 # stock will always be 4 instead of 0 after first disengage
-    values["ObjGap"] = int(min(lead_dist+2, 10)/2) if lead_visible else 0 # 1-5 based on distance to lead vehicle
-  else:
-    values["JerkUpperLimit"] = 0
-    values["JerkLowerLimit"] = 0
-    values["ComfortBandUpper"] = 0
-    values["ComfortBandLower"] = 0
-    values["ACCMode"] = 4 # stock will always be 4 instead of 0 after first disengage
-    values["ObjGap"] = 0
-
-  return packer.make_can_msg("SCC14", 0, values)
-
-def create_scc42a(packer):
-  values = {
-    "CF_FCA_Equip_Front_Radar": 1
-  }
-  return packer.make_can_msg("FRT_RADAR11", 0, values)
-
-def create_fca11(packer, fca11, fca11cnt, fca11supcnt):
-  values = fca11
-  values["CR_FCA_Alive"] = fca11cnt
-  values["Supplemental_Counter"] = fca11supcnt
-  values["CR_FCA_ChkSum"] = 0
-  dat = packer.make_can_msg("FCA11", 0, values)[2]
-  values["CR_FCA_ChkSum"] = 16 - sum([sum(divmod(i, 16)) for i in dat]) % 16
-  return packer.make_can_msg("FCA11", 0, values)
-
-def create_fca12(packer):
-  values = {
-    "FCA_USM": 3,
-    "FCA_DrvSetState": 2,
-  }
-  return packer.make_can_msg("FCA12", 0, values)
-
-def create_scc7d0(cmd):
-  return[2000, 0, cmd, 0]
