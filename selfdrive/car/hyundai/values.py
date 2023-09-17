@@ -1906,6 +1906,12 @@ LEGACY_SAFETY_MODE_CAR = {CAR.HYUNDAI_GENESIS, CAR.IONIQ_EV_2020, CAR.IONIQ_EV_L
 
 # If 0x500 is present on bus 1 it probably has a Mando radar outputting radar points.
 # If no points are outputted by default it might be possible to turn it on using  selfdrive/debug/hyundai_enable_radar_points.py
+
+if Params().get_bool("UseRadarTrack") and Params().get_bool("ExperimentalLongitudinalEnabled"):
+  RadarTrack = 'hyundai_kia_mando_front_radar_generated'
+else:
+  RadarTrack = None
+  
 DBC = {
   CAR.ELANTRA: dbc_dict('hyundai_kia_generic', None),
   CAR.ELANTRA_2021: dbc_dict('hyundai_kia_generic', None),
