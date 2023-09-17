@@ -152,6 +152,10 @@ class CarInterface(CarInterfaceBase):
       ret.wheelbase = 2.63
       ret.steerRatio = 14.56
       tire_stiffness_factor = 1
+    elif candidate in CAR.K7:
+      ret.mass = 1730.
+      ret.wheelbase = 2.85
+      ret.steerRatio = 14.5 
     elif candidate == CAR.KIA_SPORTAGE_5TH_GEN:
       ret.mass = 1700. + STD_CARGO_KG  # weight from SX and above trims, average of FWD and AWD versions
       ret.wheelbase = 2.756
