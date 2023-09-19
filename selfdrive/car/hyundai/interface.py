@@ -58,8 +58,8 @@ class CarInterface(CarInterfaceBase):
         ret.flags |= HyundaiFlags.USE_FCA.value
 
     ret.steerActuatorDelay = 0.1  # Default delay
-    ret.steerLimitTimer = 2.5
-    tire_stiffness_factor = 4.0
+    ret.steerLimitTimer = 0.9
+    tire_stiffness_factor = 1.2
     CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
 
     if candidate in (CAR.SANTA_FE, CAR.SANTA_FE_2022, CAR.SANTA_FE_HEV_2022, CAR.SANTA_FE_PHEV_2022):
