@@ -15,7 +15,7 @@ Ecu = car.CarParams.Ecu
 
 class CarControllerParams:
   ACCEL_MIN = -2.5 # m/s
-  ACCEL_MAX = 1.0 # m/s
+  ACCEL_MAX = 2.0 # m/s
 
   def __init__(self, CP):
     self.STEER_DELTA_UP = 3
@@ -23,7 +23,7 @@ class CarControllerParams:
     self.STEER_DRIVER_ALLOWANCE = 50
     self.STEER_DRIVER_MULTIPLIER = 2
     self.STEER_DRIVER_FACTOR = 1
-    self.STEER_THRESHOLD = 170
+    self.STEER_THRESHOLD = 160
     self.STEER_STEP = 1  # 100 Hz
 
     if CP.carFingerprint in CANFD_CAR:
@@ -49,7 +49,7 @@ class CarControllerParams:
 
     # Default for most HKG
     else:
-      self.STEER_MAX = 409
+      self.STEER_MAX = 384
 
 
 class HyundaiFlags(IntFlag):
